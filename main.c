@@ -7,7 +7,6 @@
 #define BLUE "\x1B[34m"
 #define NO_COLOUR "\x1B[0m"
 #define RED "\x1B[31m"
-#define LIST_NAME(ty) List_##ty
 
 LIST(char);
 CREATE_LIST(char);

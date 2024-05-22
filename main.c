@@ -279,6 +279,8 @@ ParseResult parse_array(Stream *stream, Json *out) {
     out->value.j_array.size = j.size;
     out->value.j_array.capacity = j.size;
     out->value.j_array.data = j.data;
+  } else {
+    free_list_Json(&j);
   }
 
   return result;
@@ -404,14 +406,14 @@ ParseResult parse_json(Stream *s, Json *out) {
   return result;
 }
 
-void not_pretty_print_json(Json *json) {
+void not_pretty_print(Json *json) {
   switch (json->variant) {
   case OBJECT:
     printf("{");
     for (size_t i = 0; i < json->value.j_object.size; i++) {
       printf("\"%s\"", json->value.j_object.data[i].key);
       printf(":");
-      not_pretty_print_json(json->value.j_object.data[i].value);
+      not_pretty_print(json->value.j_object.data[i].value);
 
       if (i != json->value.j_object.size - 1)
         printf(", ");
@@ -427,7 +429,7 @@ void not_pretty_print_json(Json *json) {
   case ARRAY:
     printf("[");
     for (size_t i = 0; i < json->value.j_array.size; i++) {
-      not_pretty_print_json(&json->value.j_array.data[i]);
+      not_pretty_print(&json->value.j_array.data[i]);
 
       if (i != json->value.j_array.size - 1)
         printf(", ");
@@ -453,11 +455,11 @@ void display_error(Stream *s) {
     printf("%s", NO_COLOUR);
     printf("unexpected value '%c'\n", s->input[s->current_position]);
 
-    int delta = 15;
+    long delta = 15;
     long from_position = (long)s->current_position - delta < 0
                              ? 0
                              : (long)s->current_position - delta;
-    long to_position = s->current_position + delta > s->size
+    long to_position = (long)s->current_position + delta > (long)s->size
                            ? s->size
                            : s->current_position + delta;
 
@@ -475,7 +477,7 @@ void display_error(Stream *s) {
     printf("\n");
     printf("  |  ");
     printf("%s", BLUE);
-    for (size_t i = from_position; i < s->current_position; i++)
+    for (long i = from_position; i < (long)s->current_position; i++)
       printf("~");
 
     printf("^\n");
@@ -621,7 +623,7 @@ int main(int argc, char **argv) {
   ParseResult result = parse_json(&s, &j);
 
   if (result == PARSED) {
-    not_pretty_print_json(&j);
+    not_pretty_print(&j);
     printf("\n");
   } else {
     display_error(&s);

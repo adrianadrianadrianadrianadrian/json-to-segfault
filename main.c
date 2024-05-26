@@ -213,11 +213,9 @@ int eat_char(Stream *stream, char c) {
   return 0;
 }
 
-int eat_sequential_char(Stream *stream, char c) {
+void eat_sequential_char(Stream *stream, char c) {
   while (eat_char(stream, c))
     ;
-
-  return 1;
 }
 
 ParseResult parse_string(Stream *stream, Json *out) {
@@ -265,7 +263,7 @@ ParseResult parse_array(Stream *stream, Json *out) {
         eat_sequential_char(stream, ' ');
         more_values = eat_char(stream, ',');
       } else {
-        result = more_values || inner_result == ERROR ? ERROR : NOT_PARSED;
+        result = ERROR;
         break;
       }
     }
@@ -335,9 +333,7 @@ ParseResult parse_object(Stream *stream, Json *out) {
         eat_sequential_char(stream, ' ');
         more_values = eat_char(stream, ',');
       } else {
-        result = more_values || inner_result == ERROR || l.size == 0
-                     ? ERROR
-                     : NOT_PARSED;
+        result = ERROR;
         break;
       }
     }

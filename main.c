@@ -9,7 +9,7 @@
 #define NO_COLOUR "\x1B[0m"
 #define RED "\x1B[31m"
 
-static char whitespace_chars[4] = {' ', '\n', '\t', '\r'};
+static char whitespace_ish_chars[4] = {' ', '\n', '\t', '\r'};
 
 LIST(char);
 CREATE_LIST(char);
@@ -253,7 +253,7 @@ static inline int eat_char(Stream *stream, char c) {
 }
 
 void eat_whitespace_char(Stream *stream) {
-  while (eat_oneof_char(stream, whitespace_chars, 4))
+  while (eat_oneof_char(stream, whitespace_ish_chars, 4))
     ;
 }
 

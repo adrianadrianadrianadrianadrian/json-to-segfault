@@ -1,1 +1,17 @@
-{"stuff":  [2s]}
+{
+  "_id": "665dd470e510ea53c71c01b0",
+  "index": 0,
+  "isActive": true,
+  "picture": "http://placehold.it/32x32",
+  "age": 23,
+  "eyeColor": "green",
+  "name": "Booker Robinson",
+  "gender": "male",
+  "company": "BLUPLANET",
+  "email": "bookerrobinson@bluplanet.com",
+  "phone": "+1 (965) 439-3672",
+  "address": "210 Narrows Avenue, Tyro, New Hampshire, 5170",
+  "about": "Incididunt esse tempor cillum ex in culpa sunt eu cillum velit deserunt. Exercitation elit est Lorem mollit esse labore est est elit sunt laborum pariatur sit. Eu in cillum adipisicing exercitation laboris qui aliquip ipsum duis velit consequat non mollit. Pariatur do aute exercitation reprehenderit pariatur et aliqua ex commodo fugiat eu eu magna laboris. Irure duis adipisicing irure sunt aliqua aliquip id sint ad duis sint mollit. Ex cillum enim non irure nisi. Fugiat Lorem labore id commodo eu consequat.\r\n",
+  "registered": "2018-11-10T10:06:18 -11:00",
+  "greeting": "Hello, Booker Robinson! You have 9 unread messages."
+}

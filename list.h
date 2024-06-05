@@ -33,3 +33,21 @@
 
 #define FREE_LIST(ty)                                                          \
   void free_list_##ty(LIST_NAME(ty) * l) { free(l->data); }
+
+#define FILTER_LIST(ty)                                                        \
+  void filter_list_##ty(LIST_NAME(ty) * l, int (*p)(ty *)) {                   \
+    size_t filter_count = 0;                                                   \
+    for (size_t i = 0; i < l->size; i++) {                                     \
+      if (p(&l->data[i])) {                                                    \
+        ty tmp = l->data[i];                                                   \
+        l->data[i] = l->data[filter_count];                                    \
+        l->data[filter_count] = tmp;                                           \
+        ++filter_count;                                                        \
+      }                                                                        \
+    }                                                                          \
+    if (filter_count > 0 && filter_count < l->size) {                          \
+      l->data = realloc(l->data, filter_count);                                \
+      l->size = filter_count;                                                  \
+      l->capacity = filter_count;                                              \
+    }                                                                          \
+  }

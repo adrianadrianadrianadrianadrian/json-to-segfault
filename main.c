@@ -9,12 +9,41 @@
 #define NO_COLOUR "\x1B[0m"
 #define RED "\x1B[31m"
 
-static char whitespace_ish_chars[4] = {' ', '\n', '\t', '\r'};
+int char_is_digit(char c) {
+  switch (c) {
+  case '0':
+  case '1':
+  case '2':
+  case '3':
+  case '4':
+  case '5':
+  case '6':
+  case '7':
+  case '8':
+  case '9':
+    return 1;
+  default:
+    return 0;
+  }
+}
+
+int allowed_chars(char *c) {
+  switch (*c) {
+  case ' ':
+  case '\n':
+  case '\t':
+  case '\r':
+    return 0;
+  default:
+    return 1;
+  }
+}
 
 LIST(char);
 CREATE_LIST(char);
 APPEND_LIST(char);
 FREE_LIST(char);
+FILTER_LIST(char);
 
 typedef struct {
   char *data;
@@ -24,8 +53,14 @@ typedef struct {
 } Stream;
 
 Stream create_static_stream(char *input) {
-  return (Stream){.data = input,
-                  .size = strlen(input),
+  size_t input_len = strlen(input);
+  List_char list = create_list_char(input_len);
+  memcpy(list.data, input, input_len);
+  list.size = input_len;
+  filter_list_char(&list, allowed_chars);
+
+  return (Stream){.data = list.data,
+                  .size = list.size,
                   .current_position = 0,
                   .source = NULL};
 }
@@ -57,6 +92,8 @@ int consume_stream(Stream *s, size_t amount, char *out) {
   if (s->current_position + amount > s->size) {
     if (s->source != NULL) {
       List_char next_chunk = read_file_chunk(s->source);
+      filter_list_char(&next_chunk, allowed_chars);
+
       if (next_chunk.size >= amount) {
         char *data = malloc(sizeof(*data) * (s->size + next_chunk.size));
         memcpy_ranged(data, s->data, 0, s->size);
@@ -73,6 +110,8 @@ int consume_stream(Stream *s, size_t amount, char *out) {
     }
   }
 
+  assert(s->current_position + amount <= s->size);
+
   for (size_t i = 0; i < amount; ++i) {
     out[i] = s->data[s->current_position + i];
   }
@@ -81,24 +120,9 @@ int consume_stream(Stream *s, size_t amount, char *out) {
   return 1;
 }
 
-void stream_back(Stream *s, size_t amount) { s->current_position -= amount; }
-
-int char_is_digit(char c) {
-  switch (c) {
-  case '0':
-  case '1':
-  case '2':
-  case '3':
-  case '4':
-  case '5':
-  case '6':
-  case '7':
-  case '8':
-  case '9':
-    return 1;
-  default:
-    return 0;
-  }
+void stream_back(Stream *s, size_t amount) {
+  assert(s->current_position >= amount);
+  s->current_position -= amount;
 }
 
 typedef enum { PARSED, NOT_PARSED, ERROR } ParseResult;
@@ -204,11 +228,7 @@ ParseResult parse_number(Stream *stream, Json *out) {
   long sign = 1;
 
   if (consume_stream(stream, 1, &test)) {
-    if (test == '-') {
-      sign = -1;
-    } else {
-      stream_back(stream, 1);
-    }
+    test == '-' ? sign = -1 : stream_back(stream, 1);
 
     while (consume_stream(stream, 1, &test)) {
       if (char_is_digit(test)) {
@@ -222,7 +242,7 @@ ParseResult parse_number(Stream *stream, Json *out) {
     result = NOT_PARSED;
   }
 
-  if (s.size > 0) {
+  if (result == PARSED && s.size > 0) {
     out->variant = NUMBER;
     out->value.j_number.value = sign * atol(s.data);
   } else {
@@ -252,17 +272,13 @@ static inline int eat_char(Stream *stream, char c) {
   return eat_oneof_char(stream, &c, 1);
 }
 
-void eat_whitespace_char(Stream *stream) {
-  while (eat_oneof_char(stream, whitespace_ish_chars, 4))
-    ;
-}
-
 ParseResult parse_string(Stream *stream, Json *out) {
-  List_char s = create_list_char(100);
   ParseResult result = PARSED;
   char test;
 
   if (eat_char(stream, '"')) {
+    List_char s = create_list_char(100);
+
     while (!eat_char(stream, '"')) {
       if (consume_stream(stream, 1, &test)) {
         append_list_char(&s, test);
@@ -286,37 +302,38 @@ ParseResult parse_string(Stream *stream, Json *out) {
 }
 
 ParseResult parse_array(Stream *stream, Json *out) {
-  List_Json j = create_list_Json(100);
   ParseResult result = PARSED;
   Json test;
 
   if (eat_char(stream, '[')) {
-    int more_values = 0;
+    List_Json j = create_list_Json(100);
 
-    while (!(eat_char(stream, ']') && !more_values)) {
-      eat_whitespace_char(stream);
+    while (!eat_char(stream, ']')) {
       ParseResult inner_result = parse_json(stream, &test);
 
       if (inner_result == PARSED) {
         append_list_Json(&j, test);
-        eat_whitespace_char(stream);
-        more_values = eat_char(stream, ',');
+
+        if (!eat_char(stream, ',')) {
+          result = eat_char(stream, ']') ? PARSED : ERROR;
+          break;
+        }
       } else {
         result = ERROR;
         break;
       }
     }
-  } else {
-    return NOT_PARSED;
-  }
 
-  if (result == PARSED) {
-    out->variant = ARRAY;
-    out->value.j_array.size = j.size;
-    out->value.j_array.capacity = j.size;
-    out->value.j_array.data = j.data;
+    if (result == PARSED) {
+      out->variant = ARRAY;
+      out->value.j_array.size = j.size;
+      out->value.j_array.capacity = j.size;
+      out->value.j_array.data = j.data;
+    } else {
+      free_list_Json(&j);
+    }
   } else {
-    free_list_Json(&j);
+    result = NOT_PARSED;
   }
 
   return result;
@@ -325,66 +342,65 @@ ParseResult parse_array(Stream *stream, Json *out) {
 ParseResult parse_key_value_pair(Stream *stream, KeyValuePair *kvp) {
   ParseResult result = PARSED;
   Json key;
-  Json *value = malloc(sizeof(*value));
 
   if (parse_string(stream, &key) == PARSED) {
     assert(key.variant == STRING);
-    eat_whitespace_char(stream);
+    Json *value = malloc(sizeof(*value));
 
     if (eat_char(stream, ':')) {
-      eat_whitespace_char(stream);
       result = parse_json(stream, value);
     } else {
       result = ERROR;
+    }
+
+    if (result == PARSED) {
+      size_t key_size = key.value.j_string.size;
+      char *k = malloc(sizeof(*k) * (key_size + 1));
+      memcpy(k, key.value.j_string.data, key_size);
+      k[key_size] = '\0';
+      kvp->key = k;
+      kvp->value = value;
+    } else {
+      free(value);
     }
   } else {
     result = NOT_PARSED;
   };
 
-  if (result == PARSED) {
-    size_t key_size = key.value.j_string.size;
-    char *k = malloc(sizeof(*k) * (key_size + 1));
-    memcpy(k, key.value.j_string.data, key_size);
-    k[key_size] = '\0';
-    kvp->key = k;
-    kvp->value = value;
-  } else {
-    free(value);
-  }
-
   return result;
 }
 
 ParseResult parse_object(Stream *stream, Json *out) {
-  List_KeyValuePair l = create_list_KeyValuePair(100);
   ParseResult result = PARSED;
   KeyValuePair test;
 
   if (eat_char(stream, '{')) {
-    int more_values = 0;
+    List_KeyValuePair l = create_list_KeyValuePair(100);
 
-    while (!(eat_char(stream, '}') && !more_values)) {
-      eat_whitespace_char(stream);
+    while (!eat_char(stream, '}')) {
       ParseResult inner_result = parse_key_value_pair(stream, &test);
 
       if (inner_result == PARSED) {
         append_list_KeyValuePair(&l, test);
-        eat_whitespace_char(stream);
-        more_values = eat_char(stream, ',');
+
+        if (!eat_char(stream, ',')) {
+          result = eat_char(stream, '}') ? PARSED : ERROR;
+          break;
+        }
       } else {
         result = ERROR;
         break;
       }
     }
+
+    if (result == PARSED) {
+      out->variant = OBJECT;
+      out->value.j_object = l;
+    } else {
+      free_list_KeyValuePair(&l);
+    }
   } else {
     result = NOT_PARSED;
-  }
-
-  if (result == PARSED) {
-    out->variant = OBJECT;
-    out->value.j_object = l;
-  } else {
-    free_list_KeyValuePair(&l);
   }
 
   return result;
@@ -393,8 +409,6 @@ ParseResult parse_object(Stream *stream, Json *out) {
 ParseResult parse_json(Stream *s, Json *out) {
   if (s->data != NULL && s->current_position == s->size)
     return ERROR;
-
-  eat_whitespace_char(s);
 
   ParseResult result = PARSED;
 
@@ -490,7 +504,7 @@ void display_error(Stream *s) {
   printf("%s", NO_COLOUR);
   printf("unexpected value '%c'\n", s->data[s->current_position]);
 
-  long delta = 15;
+  long delta = 20;
   long from_position = (long)s->current_position - delta < 0
                            ? 0
                            : (long)s->current_position - delta;
@@ -630,7 +644,7 @@ int run_tests() {
   test_number("-1", -1, PARSED);
   test_number("-1235235", -1235235, PARSED);
 
-  test_string("\"hahahaah\"", PARSED);
+  test_string("\"h ahahaah\"", PARSED);
   test_string("", NOT_PARSED);
   test_string("\"ahhahaha", ERROR);
 
@@ -640,6 +654,7 @@ int run_tests() {
   test_array("[1,2]", PARSED);
   test_array("[1,true,2]", PARSED);
   test_array("[1,true,2   ]", PARSED);
+  test_array("[\t\n\t\n\n   ]", PARSED);
   test_array("[1,true,2, null, true, [], [[], [[]]]]", PARSED);
   test_array("[1,true,2, null, true, [, [[], [[]]]]", ERROR);
   test_array("", NOT_PARSED);
@@ -661,6 +676,7 @@ int run_tests() {
   test_json("\"asfsadf\"", PARSED);
   test_json("{\"test\":   [2s]}", ERROR);
   test_json("{\"test\":   [2]}", PARSED);
+  test_json("{\"test\": {\n\t}}", PARSED);
 
   return 1;
 }

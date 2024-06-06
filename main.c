@@ -5,46 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define BLUE "\x1B[34m"
-#define NO_COLOUR "\x1B[0m"
-#define RED "\x1B[31m"
-
-int char_is_digit(char c) {
-  switch (c) {
-  case '0':
-  case '1':
-  case '2':
-  case '3':
-  case '4':
-  case '5':
-  case '6':
-  case '7':
-  case '8':
-  case '9':
-    return 1;
-  default:
-    return 0;
-  }
-}
-
-int allowed_chars(char *c) {
-  switch (*c) {
-  case ' ':
-  case '\n':
-  case '\t':
-  case '\r':
-    return 0;
-  default:
-    return 1;
-  }
-}
-
-LIST(char);
-CREATE_LIST(char);
-APPEND_LIST(char);
-FREE_LIST(char);
-FILTER_LIST(char);
-
+// Stream
 typedef struct {
   char *data;
   size_t current_position;
@@ -125,6 +86,60 @@ void stream_back(Stream *s, size_t amount) {
   s->current_position -= amount;
 }
 
+int eat_oneof_char(Stream *stream, char *c, size_t size) {
+  char test;
+
+  if (consume_stream(stream, 1, (char *)&test)) {
+    for (size_t i = 0; i < size; i++) {
+      if (test == c[i])
+        return 1;
+    }
+
+    stream_back(stream, 1);
+  }
+
+  return 0;
+}
+
+static inline int eat_char(Stream *stream, char c) {
+  return eat_oneof_char(stream, &c, 1);
+}
+
+void display_error(Stream *s) {
+  printf("%s error: %s unexpected value '%c'\n", RED, NO_COLOUR,
+         s->data[s->current_position]);
+
+  long delta = 20;
+  long from_position = (long)s->current_position - delta < 0
+                           ? 0
+                           : (long)s->current_position - delta;
+  long to_position = (long)s->current_position + delta > (long)s->size
+                         ? s->size
+                         : s->current_position + delta;
+
+  printf("  |  ");
+  for (long i = from_position; i < to_position; i++) {
+    char c = s->data[i];
+    if (i == (long)s->current_position) {
+      printf("%s", BLUE);
+      if (c != '\n')
+        printf("%c", s->data[i]);
+
+      printf("%s", NO_COLOUR);
+    } else {
+      if (c != '\n')
+        printf("%c", s->data[i]);
+    }
+  }
+
+  printf("\n  |  %s", BLUE);
+  for (long i = from_position; i < (long)s->current_position; i++)
+    printf("~");
+
+  printf("^\n%s", NO_COLOUR);
+}
+
+// Json
 typedef enum { PARSED, NOT_PARSED, ERROR } ParseResult;
 
 struct Json;
@@ -251,25 +266,6 @@ ParseResult parse_number(Stream *stream, Json *out) {
 
   free_list_char(&s);
   return result;
-}
-
-int eat_oneof_char(Stream *stream, char *c, size_t size) {
-  char test;
-
-  if (consume_stream(stream, 1, (char *)&test)) {
-    for (size_t i = 0; i < size; i++) {
-      if (test == c[i])
-        return 1;
-    }
-
-    stream_back(stream, 1);
-  }
-
-  return 0;
-}
-
-static inline int eat_char(Stream *stream, char c) {
-  return eat_oneof_char(stream, &c, 1);
 }
 
 ParseResult parse_string(Stream *stream, Json *out) {
@@ -414,41 +410,35 @@ ParseResult parse_json(Stream *s, Json *out) {
 
   result = parse_null(s, out);
 
-  if (result == PARSED)
+  if (result != NOT_PARSED)
     return result;
 
-  if (result != ERROR)
-    result = parse_true(s, out);
+  result = parse_true(s, out);
 
-  if (result == PARSED)
+  if (result != NOT_PARSED)
     return result;
 
-  if (result != ERROR)
-    result = parse_false(s, out);
+  result = parse_false(s, out);
 
-  if (result == PARSED)
+  if (result != NOT_PARSED)
     return result;
 
-  if (result != ERROR)
-    result = parse_number(s, out);
+  result = parse_number(s, out);
 
-  if (result == PARSED)
+  if (result != NOT_PARSED)
     return result;
 
-  if (result != ERROR)
-    result = parse_string(s, out);
+  result = parse_string(s, out);
 
-  if (result == PARSED)
+  if (result != NOT_PARSED)
     return result;
 
-  if (result != ERROR)
-    result = parse_array(s, out);
+  result = parse_array(s, out);
 
-  if (result == PARSED)
+  if (result != NOT_PARSED)
     return result;
 
-  if (result != ERROR)
-    result = parse_object(s, out);
+  result = parse_object(s, out);
 
   if (s->current_position != s->size && result != PARSED)
     result = ERROR;
@@ -461,8 +451,7 @@ void not_pretty_print(Json *json) {
   case OBJECT:
     printf("{");
     for (size_t i = 0; i < json->value.j_object.size; i++) {
-      printf("\"%s\"", json->value.j_object.data[i].key);
-      printf(":");
+      printf("\"%s\":", json->value.j_object.data[i].key);
       not_pretty_print(json->value.j_object.data[i].value);
 
       if (i != json->value.j_object.size - 1)
@@ -498,45 +487,7 @@ void not_pretty_print(Json *json) {
   }
 }
 
-void display_error(Stream *s) {
-  printf("%s", RED);
-  printf("error: ");
-  printf("%s", NO_COLOUR);
-  printf("unexpected value '%c'\n", s->data[s->current_position]);
-
-  long delta = 20;
-  long from_position = (long)s->current_position - delta < 0
-                           ? 0
-                           : (long)s->current_position - delta;
-  long to_position = (long)s->current_position + delta > (long)s->size
-                         ? s->size
-                         : s->current_position + delta;
-
-  printf("  |  ");
-  for (long i = from_position; i < to_position; i++) {
-    char c = s->data[i];
-    if (i == (long)s->current_position) {
-      printf("%s", BLUE);
-      if (c != '\n')
-        printf("%c", s->data[i]);
-
-      printf("%s", NO_COLOUR);
-    } else {
-      if (c != '\n')
-        printf("%c", s->data[i]);
-    }
-  }
-
-  printf("\n");
-  printf("  |  ");
-  printf("%s", BLUE);
-  for (long i = from_position; i < (long)s->current_position; i++)
-    printf("~");
-
-  printf("^\n");
-  printf("%s", NO_COLOUR);
-}
-
+// Tests
 void test_null(char *input, ParseResult result) {
   Stream s = create_static_stream(input);
   Json j;
@@ -655,6 +606,7 @@ int run_tests() {
   test_array("[1,true,2]", PARSED);
   test_array("[1,true,2   ]", PARSED);
   test_array("[\t\n\t\n\n   ]", PARSED);
+  test_array("[\t\n\t\n\ntrue,\n\"ahahha\",false,   ]", PARSED);
   test_array("[1,true,2, null, true, [], [[], [[]]]]", PARSED);
   test_array("[1,true,2, null, true, [, [[], [[]]]]", ERROR);
   test_array("", NOT_PARSED);
@@ -677,6 +629,7 @@ int run_tests() {
   test_json("{\"test\":   [2s]}", ERROR);
   test_json("{\"test\":   [2]}", PARSED);
   test_json("{\"test\": {\n\t}}", PARSED);
+  test_json("[{\"test\":[\n\n\t\"ahah\",\n\t\r\"test\",2]}]", PARSED);
 
   return 1;
 }
@@ -690,9 +643,13 @@ int main(int argc, char **argv) {
   }
 
   FILE *f = fopen(argv[1], "r");
+  if (f == NULL) {
+    printf("File '%s' not found\n", argv[1]);
+    return -1;
+  }
+
   Stream s = create_file_stream(f);
   Json j;
-
   ParseResult result = parse_json(&s, &j);
 
   if (result == PARSED) {

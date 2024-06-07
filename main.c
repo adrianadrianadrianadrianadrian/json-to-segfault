@@ -57,9 +57,9 @@ int consume_stream(Stream *s, size_t amount, char *out) {
         memcpy_ranged(data, s->data, 0, s->size);
         memcpy_ranged(data, next_chunk.data, s->size,
                       s->size + next_chunk.size);
-        free_list_char(&next_chunk);
         s->data = data;
         s->size += next_chunk.size;
+        free_list_char(&next_chunk);
       } else {
         free_list_char(&next_chunk);
         return 0;
@@ -145,18 +145,18 @@ void display_error(Stream *s) {
     if (i == (long)s->current_position) {
       printf("%s", BLUE);
 
-      if (!whitespace(&c))
+      if (c != '\n')
         printf("%c", c);
 
       printf("%s", NO_COLOUR);
     } else {
-      if (!whitespace(&c))
+      if (c != '\n')
         printf("%c", c);
     }
   }
 
   printf("\n  |  %s", BLUE);
-  for (long i = from_position; i < (long)s->current_position; i++)
+  for (long i = from_position; i < (long)s->current_position - 1; i++)
     printf("~");
 
   printf("^\n%s", NO_COLOUR);

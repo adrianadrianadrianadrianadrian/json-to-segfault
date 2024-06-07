@@ -1,0 +1,42 @@
+[
+  {
+    "_id": "666276dd5a35c40b49597161",
+    "index": 1,
+    "isActive": true,
+    "picture": "http://placehold.it/32x32",
+    "age": 28,
+    "eyeColor": "brown",
+    "name": "Beard Chase",
+    "gender": "male",
+    "company": "GRAINSPOT",
+    "email": "beardchase@grainspot.com",
+    "phone": "+1 (956) 575-2120",
+    "address": "800 Kenmore Court, Bartley, Federated States Of Micronesia, 3738",
+    "about": "Adipisicing irure excepteur ipsum Lorem esse nisi nisi laborum eiusmod incididunt mollit elit do. Quis laborum mollit voluptate minim esse excepteur. Laborum ipsum tempor commodo pariatur commodo reprehenderit Lorem cillum fugiat. Do eiusmod quis adipisicing fugiat dolor ex.\r\n",
+    "registered": "2019-11-02T06:27:48 -11:00",
+    "tags": [
+      "esse",
+      "incididunt",
+      "aliquip",
+      "ea",
+      "sint",
+      "id",
+      "est"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Tracey Hahn"
+      },
+      {
+        "id": 1,
+        "name": "Lakisha Cardenas"
+      },
+      {
+        "id": 2,
+        "name": "Rosemary Burris"
+      }
+    ],
+    "greeting: "Hello, Beard Chase! You have 7 unread messages.","favoriteFruit": "apple"
+  },
+]

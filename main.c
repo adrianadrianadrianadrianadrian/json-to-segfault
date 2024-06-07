@@ -18,7 +18,6 @@ Stream create_static_stream(char *input) {
   List_char list = create_list_char(input_len);
   memcpy(list.data, input, input_len);
   list.size = input_len;
-  filter_list_char(&list, allowed_chars);
 
   return (Stream){.data = list.data,
                   .size = list.size,
@@ -53,7 +52,6 @@ int consume_stream(Stream *s, size_t amount, char *out) {
   if (s->current_position + amount > s->size) {
     if (s->source != NULL) {
       List_char next_chunk = read_file_chunk(s->source);
-      filter_list_char(&next_chunk, allowed_chars);
 
       if (next_chunk.size >= amount) {
         char *data = malloc(sizeof(*data) * (s->size + next_chunk.size));
@@ -86,14 +84,12 @@ void stream_back(Stream *s, size_t amount) {
   s->current_position -= amount;
 }
 
-int eat_oneof_char(Stream *stream, char *c, size_t size) {
+int conditional_eat(Stream *stream, int (*p)(char *)) {
   char test;
 
   if (consume_stream(stream, 1, (char *)&test)) {
-    for (size_t i = 0; i < size; i++) {
-      if (test == c[i])
-        return 1;
-    }
+    if (p(&test))
+      return 1;
 
     stream_back(stream, 1);
   }
@@ -101,8 +97,34 @@ int eat_oneof_char(Stream *stream, char *c, size_t size) {
   return 0;
 }
 
-static inline int eat_char(Stream *stream, char c) {
-  return eat_oneof_char(stream, &c, 1);
+int eat_char(Stream *stream, char c) {
+  char test;
+
+  if (consume_stream(stream, 1, (char *)&test)) {
+    if (c == test)
+      return 1;
+
+    stream_back(stream, 1);
+  }
+
+  return 0;
+}
+
+void eat_whitespace(Stream *s) {
+  while (conditional_eat(s, whitespace))
+    ;
+}
+
+int eat_char_between_whitespace(Stream *stream, char c) {
+  int result = 0;
+
+  eat_whitespace(stream);
+  result = eat_char(stream, c);
+
+  if (result)
+    eat_whitespace(stream);
+
+  return result;
 }
 
 void display_error(Stream *s) {
@@ -301,17 +323,17 @@ ParseResult parse_array(Stream *stream, Json *out) {
   ParseResult result = PARSED;
   Json test;
 
-  if (eat_char(stream, '[')) {
+  if (eat_char_between_whitespace(stream, '[')) {
     List_Json j = create_list_Json(100);
 
-    while (!eat_char(stream, ']')) {
+    while (!eat_char_between_whitespace(stream, ']')) {
       ParseResult inner_result = parse_json(stream, &test);
 
       if (inner_result == PARSED) {
         append_list_Json(&j, test);
 
-        if (!eat_char(stream, ',')) {
-          result = eat_char(stream, ']') ? PARSED : ERROR;
+        if (!eat_char_between_whitespace(stream, ',')) {
+          result = eat_char_between_whitespace(stream, ']') ? PARSED : ERROR;
           break;
         }
       } else {
@@ -343,7 +365,7 @@ ParseResult parse_key_value_pair(Stream *stream, KeyValuePair *kvp) {
     assert(key.variant == STRING);
     Json *value = malloc(sizeof(*value));
 
-    if (eat_char(stream, ':')) {
+    if (eat_char_between_whitespace(stream, ':')) {
       result = parse_json(stream, value);
     } else {
       result = ERROR;
@@ -370,17 +392,17 @@ ParseResult parse_object(Stream *stream, Json *out) {
   ParseResult result = PARSED;
   KeyValuePair test;
 
-  if (eat_char(stream, '{')) {
+  if (eat_char_between_whitespace(stream, '{')) {
     List_KeyValuePair l = create_list_KeyValuePair(100);
 
-    while (!eat_char(stream, '}')) {
+    while (!eat_char_between_whitespace(stream, '}')) {
       ParseResult inner_result = parse_key_value_pair(stream, &test);
 
       if (inner_result == PARSED) {
         append_list_KeyValuePair(&l, test);
 
-        if (!eat_char(stream, ',')) {
-          result = eat_char(stream, '}') ? PARSED : ERROR;
+        if (!eat_char_between_whitespace(stream, ',')) {
+          result = eat_char_between_whitespace(stream, '}') ? PARSED : ERROR;
           break;
         }
       } else {
@@ -407,6 +429,8 @@ ParseResult parse_json(Stream *s, Json *out) {
     return ERROR;
 
   ParseResult result = PARSED;
+
+  eat_whitespace(s);
 
   result = parse_null(s, out);
 

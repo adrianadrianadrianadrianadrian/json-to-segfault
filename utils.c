@@ -30,15 +30,15 @@ int char_is_digit(char c) {
   }
 }
 
-int allowed_chars(char *c) {
+int whitespace(char *c) {
   switch (*c) {
   case ' ':
   case '\n':
   case '\t':
   case '\r':
-    return 0;
-  default:
     return 1;
+  default:
+    return 0;
   }
 }
 

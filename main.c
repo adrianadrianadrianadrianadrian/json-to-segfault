@@ -52,11 +52,11 @@ int consume_stream(Stream *s, size_t amount, char *out) {
   if (s->current_position + amount > s->size) {
     if (s->source != NULL) {
       List_char next_chunk = read_file_chunk(s->source);
-
       if (next_chunk.size >= amount) {
         char *data = malloc(sizeof(*data) * (s->size + next_chunk.size));
         memcpy_ranged(data, s->data, 0, s->size);
-        memcpy_ranged(data, next_chunk.data, s->size, next_chunk.size);
+        memcpy_ranged(data, next_chunk.data, s->size,
+                      s->size + next_chunk.size);
         free_list_char(&next_chunk);
         s->data = data;
         s->size += next_chunk.size;
@@ -144,13 +144,14 @@ void display_error(Stream *s) {
     char c = s->data[i];
     if (i == (long)s->current_position) {
       printf("%s", BLUE);
-      if (c != '\n')
-        printf("%c", s->data[i]);
+
+      if (!whitespace(&c))
+        printf("%c", c);
 
       printf("%s", NO_COLOUR);
     } else {
-      if (c != '\n')
-        printf("%c", s->data[i]);
+      if (!whitespace(&c))
+        printf("%c", c);
     }
   }
 

@@ -56,5 +56,5 @@ void memcpy_ranged(void *dest, const void *src, size_t from, size_t to) {
   const char *s = src;
 
   for (size_t i = from; i < to; i++)
-    d[i] = s[i];
+    d[i] = s[i - from];
 }

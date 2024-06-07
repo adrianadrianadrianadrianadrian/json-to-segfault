@@ -471,18 +471,24 @@ ParseResult parse_json(Stream *s, Json *out) {
   return result;
 }
 
-void not_pretty_print(Json *json) {
+void not_pretty_print(Json *json, int depth) {
+  if (depth > 0)
+    depth += 2;
+
+  int inner_depth = depth + 2;
+  int previous_depth = depth - 2 >= 0 ? depth - 2 : 0;
+
   switch (json->variant) {
   case OBJECT:
-    printf("{");
+    printf("{\n");
     for (size_t i = 0; i < json->value.j_object.size; i++) {
-      printf("\"%s\":", json->value.j_object.data[i].key);
-      not_pretty_print(json->value.j_object.data[i].value);
+      printf("%*c\"%s\": ", inner_depth, ' ', json->value.j_object.data[i].key);
+      not_pretty_print(json->value.j_object.data[i].value, inner_depth);
 
       if (i != json->value.j_object.size - 1)
-        printf(", ");
+        printf(",\n");
     }
-    printf("}");
+    printf("\n%*c}", previous_depth, ' ');
     break;
   case STRING:
     printf("\"%s\"", json->value.j_string.data);
@@ -491,14 +497,15 @@ void not_pretty_print(Json *json) {
     printf("%ld", json->value.j_number.value);
     break;
   case ARRAY:
-    printf("[");
+    printf("[\n");
     for (size_t i = 0; i < json->value.j_array.size; i++) {
-      not_pretty_print(&json->value.j_array.data[i]);
+      printf("%*c", inner_depth, ' ');
+      not_pretty_print(&json->value.j_array.data[i], inner_depth);
 
       if (i != json->value.j_array.size - 1)
-        printf(", ");
+        printf(",\n");
     }
-    printf("]");
+    printf("\n%*c]", previous_depth, ' ');
     break;
   case TRUE:
     printf("true");
@@ -678,7 +685,7 @@ int main(int argc, char **argv) {
   ParseResult result = parse_json(&s, &j);
 
   if (result == PARSED) {
-    not_pretty_print(&j);
+    not_pretty_print(&j, 0);
   } else {
     display_error(&s);
   }

@@ -45,9 +45,6 @@
         ++filter_count;                                                        \
       }                                                                        \
     }                                                                          \
-    if (filter_count > 0 && filter_count < l->size) {                          \
-      l->data = realloc(l->data, filter_count);                                \
-      l->size = filter_count;                                                  \
-      l->capacity = filter_count;                                              \
-    }                                                                          \
+    l->size = filter_count;                                                    \
+    l->capacity = filter_count;                                                \
   }

@@ -46,5 +46,4 @@
             }                                                                  \
         }                                                                      \
         l->size = filter_count;                                                \
-        l->capacity = filter_count;                                            \
     }

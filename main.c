@@ -55,9 +55,8 @@ int consume_stream(Stream *s, size_t amount, char *out) {
             if (next_chunk.size >= amount) {
                 char *data =
                     malloc(sizeof(*data) * (s->size + next_chunk.size));
-                memcpy_ranged(data, s->data, 0, s->size);
-                memcpy_ranged(data, next_chunk.data, s->size,
-                              s->size + next_chunk.size);
+                memcpy(data, s->data, s->size);
+                memcpy(data + s->size, next_chunk.data, next_chunk.size);
                 s->data = data;
                 s->size += next_chunk.size;
                 free_list_char(&next_chunk);
@@ -216,7 +215,7 @@ ParseResult parse_null(Stream *stream, Json *out) {
     char test[null_size];
 
     if (consume_stream(stream, null_size, (char *)&test)) {
-        if (strcmp_s("null", (char *)&test, null_size)) {
+        if (!strncmp("null", (char *)&test, null_size)) {
             out->variant = J_NULL;
             return PARSED;
         } else {
@@ -232,7 +231,7 @@ ParseResult parse_true(Stream *stream, Json *out) {
     char test[true_size];
 
     if (consume_stream(stream, true_size, (char *)&test)) {
-        if (strcmp_s("true", (char *)&test, true_size)) {
+        if (!strncmp("true", (char *)&test, true_size)) {
             out->variant = TRUE;
             return PARSED;
         } else {
@@ -248,7 +247,7 @@ ParseResult parse_false(Stream *stream, Json *out) {
     char test[false_size];
 
     if (consume_stream(stream, false_size, (char *)&test)) {
-        if (strcmp_s("false", (char *)&test, false_size)) {
+        if (!strncmp("false", (char *)&test, false_size)) {
             out->variant = FALSE;
             return PARSED;
         } else {
